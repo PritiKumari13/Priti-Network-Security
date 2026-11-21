@@ -2,6 +2,17 @@
 
 A machine-learning project that classifies website records as **Phishing** or **Legitimate** using a set of 30 website-related features. The project includes a data-ingestion and model-training pipeline, MLflow experiment tracking, a FastAPI prediction service, and a simple browser-based interface for CSV predictions.
 
+## 🌐 Live Demo
+
+**Live Application:**  
+https://priti-network-security.onrender.com/
+
+**API Documentation (Swagger):**  
+https://priti-network-security.onrender.com/docs
+
+**GitHub Repository:**  
+https://github.com/PritiKumari13/Priti-Network-Security
+
 > **Project status:** Local training and CSV prediction workflow tested. The FastAPI homepage, prediction results page, and CSV download were tested locally. A public cloud deployment has not yet been documented.
 
 ## Table of Contents
