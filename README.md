@@ -245,6 +245,62 @@ Then visit <http://127.0.0.1:5000/>. The exact tracking URI and backend configur
 
 > **Model metrics:** Add the final verified test-set accuracy, precision, recall, F1-score, and selected model name here after confirming them from the MLflow run or training logs. No performance values are stated in this README because they have not yet been verified for publication.
 
+## Model Evaluation
+
+### Selected Model
+
+**Random Forest Classifier**
+
+The model was selected using GridSearchCV with stratified 3-fold cross-validation. Macro F1-score was used as the model-selection metric. The held-out test dataset was reserved for final evaluation.
+
+### Training vs Testing Performance
+
+| Metric | Training | Testing |
+|---|---:|---:|
+| Accuracy | 99.03% | 96.92% |
+| Macro Precision | 99.06% | 97.00% |
+| Macro Recall | 98.97% | 96.79% |
+| Macro F1-score | 99.01% | 96.88% |
+
+### Class-wise Testing Performance
+
+| Metric | Phishing (0) | Legitimate (1) |
+|---|---:|---:|
+| Precision | 97.63% | 96.38% |
+| Recall | 95.46% | 98.11% |
+| F1-score | 96.53% | 97.24% |
+
+### Testing Confusion Matrix
+
+Rows represent actual classes and columns represent predicted classes.
+
+| Actual / Predicted | Phishing | Legitimate |
+|---|---:|---:|
+| Phishing | 946 | 45 |
+| Legitimate | 23 | 1197 |
+
+- Total test records: 2,211
+- Correct predictions: 2,143
+- Missed phishing records: 45
+- Legitimate records incorrectly flagged as phishing: 23
+
+### MLflow Experiment Tracking
+
+MLflow was used to record:
+- Training and testing evaluation runs
+- Overall and class-specific metrics
+- Confusion matrix artifacts
+- Model registration and versioning
+
+Registered model: `NetworkSecurityModel`
+
+Latest registered version: `4`
+
+### Evaluation Note
+
+These results represent evaluation on the held-out test split of the project dataset. Performance on previously unseen, real-world URLs may differ. The application currently accepts extracted website features through CSV upload rather than raw URLs.
+
+
 ## Output Format
 
 The prediction CSV retains the input feature columns and adds two prediction columns. Example:

@@ -20,11 +20,41 @@ class DataTransformationArtifact:
     transformed_train_file_path: str
     transformed_test_file_path: str
 
+
 @dataclass
 class ClassificationMetricArtifact:
-    f1_score: float
-    precision_score: float
-    recall_score: float
+    accuracy: float
+
+    macro_precision_score: float
+    macro_recall_score: float
+    macro_f1_score: float
+
+    phishing_precision_score: float
+    phishing_recall_score: float
+    phishing_f1_score: float
+
+    legitimate_precision_score: float
+    legitimate_recall_score: float
+    legitimate_f1_score: float
+
+    actual_phishing_predicted_phishing: int
+    actual_phishing_predicted_legitimate: int
+    actual_legitimate_predicted_phishing: int
+    actual_legitimate_predicted_legitimate: int
+
+    # Backward compatibility with existing model_trainer.py
+    @property
+    def f1_score(self):
+        return self.legitimate_f1_score
+
+    @property
+    def precision_score(self):
+        return self.legitimate_precision_score
+
+    @property
+    def recall_score(self):
+        return self.legitimate_recall_score
+
 
 @dataclass
 class ModelTrainerArtifact:

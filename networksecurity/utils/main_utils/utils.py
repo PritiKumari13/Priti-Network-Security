@@ -1,107 +1,235 @@
-import yaml
-from networksecurity.exception.exception import NetworkSecurityException
-from networksecurity.logging.logger import logging
-import os,sys
-import numpy as np
-#import dill
+
+import os
+import sys
 import pickle
 
-from sklearn.metrics import r2_score
-from sklearn.model_selection import GridSearchCV
+import yaml
+import numpy as np
+
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+
+from networksecurity.exception.exception import NetworkSecurityException
+from networksecurity.logging.logger import logging
+
+
+# --------------------------------------------------
+# Read YAML File
+# --------------------------------------------------
 
 def read_yaml_file(file_path: str) -> dict:
     try:
-        with open(file_path, "rb") as yaml_file:
+        with open(file_path, "r", encoding="utf-8") as yaml_file:
             return yaml.safe_load(yaml_file)
+
     except Exception as e:
         raise NetworkSecurityException(e, sys) from e
 
-def write_yaml_file(file_path: str, content: object, replace: bool = False) -> None:
-    try:
-        if replace:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, "w") as file:
-            yaml.dump(content, file)
-    except Exception as e:
-        raise NetworkSecurityException(e, sys)
+def convert_to_python_types(value):
+    """Convert NumPy objects into standard Python objects."""
 
-def save_numpy_array_data(file_path: str, array: np.array):
-    """
-    Save numpy array data to file
-    file_path: str location of file to save
-    array: np.array data to save
-    """
+    if isinstance(value, np.generic):
+        return value.item()
+
+    if isinstance(value, np.ndarray):
+        return [
+            convert_to_python_types(item)
+            for item in value.tolist()
+        ]
+
+    if isinstance(value, dict):
+        return {
+            key: convert_to_python_types(val)
+            for key, val in value.items()
+        }
+
+    if isinstance(value, (list, tuple)):
+        return [
+            convert_to_python_types(item)
+            for item in value
+        ]
+
+    return value
+# --------------------------------------------------
+# Write YAML File
+# --------------------------------------------------
+
+def write_yaml_file(
+    file_path: str,
+    content: object,
+    replace: bool = False
+) -> None:
     try:
-        dir_path = os.path.dirname(file_path)
-        os.makedirs(dir_path, exist_ok=True)
+        if replace and os.path.exists(file_path):
+            os.remove(file_path)
+
+        directory = os.path.dirname(file_path) or "."
+        os.makedirs(directory, exist_ok=True)
+
+        with open(file_path, "w", encoding="utf-8") as file:
+            yaml.safe_dump(
+    convert_to_python_types(content),
+    file,
+    sort_keys=False
+)
+
+    except Exception as e:
+        raise NetworkSecurityException(e, sys) from e
+
+
+# --------------------------------------------------
+# Save NumPy Array
+# --------------------------------------------------
+
+def save_numpy_array_data(
+    file_path: str,
+    array: np.ndarray
+) -> None:
+    try:
+        directory = os.path.dirname(file_path) or "."
+        os.makedirs(directory, exist_ok=True)
+
         with open(file_path, "wb") as file_obj:
             np.save(file_obj, array)
+
     except Exception as e:
         raise NetworkSecurityException(e, sys) from e
+
+
+# --------------------------------------------------
+# Save Python Object
+# --------------------------------------------------
 
 def save_object(file_path: str, obj: object) -> None:
     try:
-        logging.info("Entered the save_object method of MainUtils class")
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        logging.info("Entered save_object method")
+
+        directory = os.path.dirname(file_path) or "."
+        os.makedirs(directory, exist_ok=True)
+
         with open(file_path, "wb") as file_obj:
             pickle.dump(obj, file_obj)
-        logging.info("Exited the save_object method of MainUtils class")
+
+        logging.info("Exited save_object method")
+
     except Exception as e:
         raise NetworkSecurityException(e, sys) from e
 
-def load_object(file_path: str, ) -> object:
+
+# --------------------------------------------------
+# Load Python Object
+# --------------------------------------------------
+
+def load_object(file_path: str) -> object:
     try:
         if not os.path.exists(file_path):
-            raise Exception(f"The file: {file_path} is not exists")
+            raise FileNotFoundError(
+                f"File does not exist: {file_path}"
+            )
+
         with open(file_path, "rb") as file_obj:
-            print(file_obj)
             return pickle.load(file_obj)
+
     except Exception as e:
         raise NetworkSecurityException(e, sys) from e
 
-def load_numpy_array_data(file_path: str) -> np.array:
-    """
-    load numpy array data from file
-    file_path: str location of file to load
-    return: np.array data loaded
-    """
+
+# --------------------------------------------------
+# Load NumPy Array
+# --------------------------------------------------
+
+def load_numpy_array_data(file_path: str) -> np.ndarray:
     try:
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(
+                f"File does not exist: {file_path}"
+            )
+
         with open(file_path, "rb") as file_obj:
             return np.load(file_obj)
+
     except Exception as e:
         raise NetworkSecurityException(e, sys) from e
 
 
+# --------------------------------------------------
+# Evaluate and Select Machine Learning Models
+# --------------------------------------------------
 
-def evaluate_models(X_train, y_train,X_test,y_test,models,param):
+def evaluate_models(
+    X_train,
+    y_train,
+    X_test,
+    y_test,
+    models,
+    param
+):
     try:
+        if not models:
+            raise ValueError("No models provided for evaluation.")
+
         report = {}
+        best_models = {}
 
-        for i in range(len(list(models))):
-            model = list(models.values())[i]
-            para=param[list(models.keys())[i]]
+        # Stratified cross-validation on training data only
+        stratified_cv = StratifiedKFold(
+            n_splits=3,
+            shuffle=True,
+            random_state=42
+        )
 
-            gs = GridSearchCV(model,para,cv=3)
-            gs.fit(X_train,y_train)
+        for model_name, model in models.items():
 
-            model.set_params(**gs.best_params_)
-            model.fit(X_train,y_train)
+            logging.info(
+                f"Starting hyperparameter tuning: {model_name}"
+            )
 
-            #model.fit(X_train, y_train)  # Train model
+            param_grid = param.get(model_name, {})
 
-            y_train_pred = model.predict(X_train)
+            # Grid Search using training data only
+            grid_search = GridSearchCV(
+                estimator=model,
+                param_grid=param_grid,
+                scoring="f1_macro",
+                cv=stratified_cv,
+                n_jobs=-1,
+                refit=True,
+                error_score="raise"
+            )
 
-            y_test_pred = model.predict(X_test)
+            grid_search.fit(X_train, y_train)
 
-            train_model_score = r2_score(y_train, y_train_pred)
+            # Retrieve best estimator
+            best_model = grid_search.best_estimator_
 
-            test_model_score = r2_score(y_test, y_test_pred)
+            best_models[model_name] = best_model
 
-            report[list(models.keys())[i]] = test_model_score
+            # Store cross-validation macro F1 score
+            report[model_name] = float(
+                grid_search.best_score_
+            )
+
+            logging.info(
+                f"Best parameters for {model_name}: "
+                f"{grid_search.best_params_}"
+            )
+
+            logging.info(
+                f"Cross-validation macro F1 for {model_name}: "
+                f"{grid_search.best_score_}"
+            )
+
+        # Update original model dictionary with tuned estimators
+        models.update(best_models)
+
+        # X_test and y_test are intentionally not used here.
+        # They are reserved for independent final evaluation
+        # inside ModelTrainer.train_model().
+
+        logging.info(
+            f"Model evaluation report: {report}"
+        )
 
         return report
 
     except Exception as e:
-        raise NetworkSecurityException(e, sys)
+        raise NetworkSecurityException(e, sys) from e

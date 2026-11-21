@@ -38,9 +38,9 @@ from networksecurity.utils.ml_utils.metric.classification_metric import (
 )
 
 
-# =========================================================
-# MLFLOW CONFIGURATION
-# =========================================================
+# --------------------------------------------------
+# MLflow Configuration
+# --------------------------------------------------
 
 load_dotenv()
 
@@ -50,20 +50,20 @@ if MLFLOW_TRACKING_URI:
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_registry_uri(MLFLOW_TRACKING_URI)
 
-    if os.getenv("MLFLOW_TRACKING_USERNAME"):
-        os.environ["MLFLOW_TRACKING_USERNAME"] = os.getenv(
-            "MLFLOW_TRACKING_USERNAME"
-        )
+if os.getenv("MLFLOW_TRACKING_USERNAME"):
+    os.environ["MLFLOW_TRACKING_USERNAME"] = os.getenv(
+        "MLFLOW_TRACKING_USERNAME"
+    )
 
-    if os.getenv("MLFLOW_TRACKING_PASSWORD"):
-        os.environ["MLFLOW_TRACKING_PASSWORD"] = os.getenv(
-            "MLFLOW_TRACKING_PASSWORD"
-        )
+if os.getenv("MLFLOW_TRACKING_PASSWORD"):
+    os.environ["MLFLOW_TRACKING_PASSWORD"] = os.getenv(
+        "MLFLOW_TRACKING_PASSWORD"
+    )
 
 
-# =========================================================
-# MODEL TRAINER CLASS
-# =========================================================
+# --------------------------------------------------
+# Model Trainer Class
+# --------------------------------------------------
 
 class ModelTrainer:
 
@@ -79,56 +79,116 @@ class ModelTrainer:
         except Exception as e:
             raise NetworkSecurityException(e, sys) from e
 
-    # =====================================================
-    # MLFLOW TRACKING
-    # =====================================================
+    # --------------------------------------------------
+    # MLflow Tracking
+    # --------------------------------------------------
 
-    def track_mlflow(self, best_model, classificationmetric):
-
+    def track_mlflow(
+        self,
+        best_model,
+        classificationmetric,
+        dataset_type
+    ):
         try:
-
             tracking_url_type_store = urlparse(
                 mlflow.get_tracking_uri()
             ).scheme
 
-            with mlflow.start_run():
+            run_name = f"{dataset_type}_evaluation"
 
-                f1_score = classificationmetric.f1_score
-                precision_score = classificationmetric.precision_score
-                recall_score = classificationmetric.recall_score
+            with mlflow.start_run(run_name=run_name):
 
-                mlflow.log_metric("f1_score", f1_score)
-                mlflow.log_metric("precision", precision_score)
-                mlflow.log_metric("recall_score", recall_score)
+                metrics = {
+                    "accuracy": classificationmetric.accuracy,
 
-                trusted_types = [
-                    "sklearn.tree._tree.Tree"
-                ]
+                    "macro_precision": classificationmetric.macro_precision_score,
+                    "macro_recall": classificationmetric.macro_recall_score,
+                    "macro_f1_score": classificationmetric.macro_f1_score,
 
-                # Model registry does not work with file store
-                if tracking_url_type_store != "file":
+                    # Class 0: Phishing
+                    "phishing_precision": classificationmetric.phishing_precision_score,
+                    "phishing_recall": classificationmetric.phishing_recall_score,
+                    "phishing_f1_score": classificationmetric.phishing_f1_score,
 
-                    mlflow.sklearn.log_model(
-                        sk_model=best_model,
-                        name="model",
-                        registered_model_name="NetworkSecurityModel",
-                        skops_trusted_types=trusted_types,
-                    )
+                    # Class 1: Legitimate
+                    "legitimate_precision": classificationmetric.legitimate_precision_score,
+                    "legitimate_recall": classificationmetric.legitimate_recall_score,
+                    "legitimate_f1_score": classificationmetric.legitimate_f1_score,
 
-                else:
+                    # Confusion matrix
+                    "actual_phishing_predicted_phishing":
+                        classificationmetric.actual_phishing_predicted_phishing,
 
-                    mlflow.sklearn.log_model(
-                        sk_model=best_model,
-                        name="model",
-                        skops_trusted_types=trusted_types,
-                    )
+                    "actual_phishing_predicted_legitimate":
+                        classificationmetric.actual_phishing_predicted_legitimate,
+
+                    "actual_legitimate_predicted_phishing":
+                        classificationmetric.actual_legitimate_predicted_phishing,
+
+                    "actual_legitimate_predicted_legitimate":
+                        classificationmetric.actual_legitimate_predicted_legitimate,
+                }
+
+                mlflow.log_metrics(metrics)
+
+                mlflow.set_tag("dataset_split", dataset_type)
+                mlflow.set_tag("class_0", "Phishing")
+                mlflow.set_tag("class_1", "Legitimate")
+                mlflow.set_tag(
+                    "model_type",
+                    type(best_model).__name__
+                )
+
+                confusion_matrix_data = {
+                    "labels": ["Phishing (0)", "Legitimate (1)"],
+                    "matrix": [
+                        [
+                            classificationmetric.actual_phishing_predicted_phishing,
+                            classificationmetric.actual_phishing_predicted_legitimate
+                        ],
+                        [
+                            classificationmetric.actual_legitimate_predicted_phishing,
+                            classificationmetric.actual_legitimate_predicted_legitimate
+                        ]
+                    ],
+                    "orientation": "Rows = actual, columns = predicted"
+                }
+
+                mlflow.log_dict(
+                    confusion_matrix_data,
+                    "evaluation/confusion_matrix.json"
+                )
+
+                # Register model only during training evaluation
+                if dataset_type == "train":
+
+                    trusted_types = [
+                        "sklearn.tree._tree.Tree"
+                    ]
+
+                    if tracking_url_type_store != "file":
+
+                        mlflow.sklearn.log_model(
+                            sk_model=best_model,
+                            name="model",
+                            registered_model_name="NetworkSecurityModel",
+                            skops_trusted_types=trusted_types,
+                        )
+
+                    else:
+
+                        mlflow.sklearn.log_model(
+                            sk_model=best_model,
+                            name="model",
+                            skops_trusted_types=trusted_types,
+                        )
 
         except Exception as e:
             raise NetworkSecurityException(e, sys) from e
 
-    # =====================================================
-    # MODEL TRAINING
-    # =====================================================
+    # --------------------------------------------------
+    # Model Training and Evaluation
+    # --------------------------------------------------
 
     def train_model(self, X_train, y_train, x_test, y_test):
 
@@ -145,11 +205,11 @@ class ModelTrainer:
             params = {
 
                 "Decision Tree": {
-                    "criterion": ["gini", "entropy", "log_loss"],
+                    "criterion": ["gini", "entropy", "log_loss"]
                 },
 
                 "Random Forest": {
-                    "n_estimators": [8, 16, 32, 128, 256],
+                    "n_estimators": [8, 16, 32, 128, 256]
                 },
 
                 "Gradient Boosting": {
@@ -166,7 +226,7 @@ class ModelTrainer:
                 },
             }
 
-            # Evaluate models
+            # Evaluate candidate models
             model_report = evaluate_models(
                 X_train=X_train,
                 y_train=y_train,
@@ -176,7 +236,10 @@ class ModelTrainer:
                 param=params,
             )
 
-            # Find best model
+            if not model_report:
+                raise ValueError("Model evaluation returned no results.")
+
+            # Select best model
             best_model_score = max(model_report.values())
 
             best_model_name = list(model_report.keys())[
@@ -200,10 +263,10 @@ class ModelTrainer:
                 f"Training metrics: {classification_train_metric}"
             )
 
-            # Track training metrics
             self.track_mlflow(
                 best_model,
                 classification_train_metric,
+                dataset_type="train",
             )
 
             # Testing predictions
@@ -218,45 +281,43 @@ class ModelTrainer:
                 f"Testing metrics: {classification_test_metric}"
             )
 
-            # Track testing metrics
             self.track_mlflow(
                 best_model,
                 classification_test_metric,
+                dataset_type="test",
             )
 
-            # Load preprocessor
+            # Load preprocessing object
             preprocessor = load_object(
                 file_path=self.data_transformation_artifact.transformed_object_file_path
             )
 
-            # Create model directory
+            # Save trained model
             model_dir_path = os.path.dirname(
                 self.model_trainer_config.trained_model_file_path
             )
 
             os.makedirs(model_dir_path, exist_ok=True)
 
-            # Create network model
             network_model = NetworkModel(
                 preprocessor=preprocessor,
-                model=best_model,
+                model=best_model
             )
 
-            # Save complete network model
             save_object(
                 file_path=self.model_trainer_config.trained_model_file_path,
                 obj=network_model,
             )
 
-            # Save final trained classifier
+            # Save final estimator
             os.makedirs("final_model", exist_ok=True)
 
             save_object(
                 file_path="final_model/model.pkl",
-                obj=best_model,
+                obj=best_model
             )
 
-            # Create model trainer artifact
+            # Create training artifact
             model_trainer_artifact = ModelTrainerArtifact(
                 trained_model_file_path=self.model_trainer_config.trained_model_file_path,
                 train_metric_artifact=classification_train_metric,
@@ -272,9 +333,9 @@ class ModelTrainer:
         except Exception as e:
             raise NetworkSecurityException(e, sys) from e
 
-    # =====================================================
-    # INITIATE MODEL TRAINER
-    # =====================================================
+    # --------------------------------------------------
+    # Initiate Model Trainer Pipeline
+    # --------------------------------------------------
 
     def initiate_model_trainer(self) -> ModelTrainerArtifact:
 
@@ -288,18 +349,15 @@ class ModelTrainer:
                 self.data_transformation_artifact.transformed_test_file_path
             )
 
-            # Load training and testing arrays
             train_arr = load_numpy_array_data(train_file_path)
             test_arr = load_numpy_array_data(test_file_path)
 
-            # Split features and target
             x_train = train_arr[:, :-1]
             y_train = train_arr[:, -1]
 
             x_test = test_arr[:, :-1]
             y_test = test_arr[:, -1]
 
-            # Initiate model training
             model_trainer_artifact = self.train_model(
                 x_train,
                 y_train,
