@@ -1,0 +1,139 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediction Results | Network Security</title>
+
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 30px 20px;
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            color: #172033;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: white;
+            padding: 28px;
+            border-radius: 14px;
+            box-shadow: 0 5px 20px rgba(0,0,0,.07);
+        }
+
+        h1 { color: #123b70; }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        .stat {
+            padding: 20px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+        }
+
+        .stat h2 { margin: 5px 0; }
+
+        .phishing { color: #dc2626; }
+        .legitimate { color: #15803d; }
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin-top: 25px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 13px;
+        }
+
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 10px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        th {
+            background: #123b70;
+            color: white;
+        }
+
+        tr:nth-child(even) { background: #f8fafc; }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 25px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 20px;
+            color: white;
+            background: #1264b4;
+            text-decoration: none;
+            border-radius: 7px;
+        }
+
+        .secondary { background: #475569; }
+
+        @media (max-width: 600px) {
+            .stats { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Prediction Results</h1>
+
+        <p>Your uploaded dataset has been processed.</p>
+
+        <div class="stats">
+            <div class="stat">
+                <p>Total Records</p>
+                <h2>{{ total }}</h2>
+            </div>
+
+            <div class="stat">
+                <p>Phishing Websites</p>
+                <h2 class="phishing">{{ phishing_count }}</h2>
+            </div>
+
+            <div class="stat">
+                <p>Legitimate Websites</p>
+                <h2 class="legitimate">{{ legitimate_count }}</h2>
+            </div>
+        </div>
+
+        <h2>Detailed Prediction Table</h2>
+
+        <div class="table-wrapper">
+            {{ table | safe }}
+        </div>
+
+        <div class="actions">
+            <a class="btn" href="/download">
+                Download Prediction CSV
+            </a>
+
+            <a class="btn secondary" href="/">
+                Upload Another File
+            </a>
+        </div>
+    </div>
+</body>
+</html>
