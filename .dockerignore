@@ -1,0 +1,31 @@
+# Secrets
+.env
+.env.*
+
+# Virtual environments
+venv/
+venv*/
+.venv/
+
+# Git
+.git/
+.github/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Generated training files
+Artifacts/
+logs/
+mlruns/
+mlflow.db
+
+# Local datasets and prediction files
+Network_Data/
+valid_data/
+prediction_output/
+
+# IDE files
+.vscode/
+.idea/
